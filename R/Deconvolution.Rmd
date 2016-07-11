@@ -36,6 +36,8 @@ Coloncancerdatapre<-function(){
   rlt$signature<-signatures
   return(rlt)
 }
+
+
 GSIMethDecon<-function(data){
   data<-data.matrix(data)
   group=names(table(colnames(data)))
@@ -274,10 +276,13 @@ rownames(acc1)=colnames(NewRealMatrix1)
 rownames(acc2)=colnames(NewRealMatrix2)
 rownames(acc3)=colnames(NewRealMatrix3)
 acc1
+boxplot(acc1)
 colMeans(acc1)
 acc2
+boxplot(acc2)
 colMeans(acc2)
 acc3
+boxplot(acc3)
 colMeans(acc3)
 write.table(acc1,file="Colon-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
 write.table(acc2,file="NormalPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
