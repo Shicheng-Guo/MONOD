@@ -23,7 +23,7 @@ Coloncancerdatapre<-function(){
   colnames(data)[grep("6-P-",colnames(data))]<-"CCP"
   colnames(data)[grep("7-P-",colnames(data))]<-"LCP"
   colnames(data)[grep("NC-P-",colnames(data))]<-"NCP"
-  data1<-data[,grep("Brain|Stomach|Lung|Heart|Colon|WBC|Intestine|Liver|Esophagus|Kidney|CCP|CCT|CCTmix|NCP|LCTmix|LCP",colnames(data))]
+  data1<-data[,grep("Brain|Stomach|Lung|Heart|Colon|WBC|Intestine|Liver|Esophagus|Kidney|CCP|CCT|LCT|CCTmix|NCP|LCTmix|LCP",colnames(data))]
   data1_ref<-data1[,-(grep("CCP|CCTmix|NCP|LCP|LCTmix",colnames(data1)))]
   base=unlist(lapply(strsplit(colnames(data1_ref),"[.]"),function(x) x[[1]]))
   colnames(data1_ref)<-base
@@ -54,7 +54,6 @@ GSIMethDecon<-function(data){
     gmaxgroup<-c(gmaxgroup,gmax)
     gsi<-c(gsi,gsit)
     avebase<-rbind(avebase,ave)
-    print(i)
   }
   rlt=data.frame(region=rownames(data),group=gmaxgroup,GSI=gsi,avebase)
   return(rlt)
@@ -206,7 +205,6 @@ Rlt$R2<-R
 Rlt$data<-dataR
 return(Rlt)
 }
-
 rlt<-linearMHB()
 linearMHBs<-rownames(rlt$data)
 ```
@@ -233,6 +231,7 @@ RealMatrix<-RealMatrix[-which(! is.finite(rowSums(RealMatrix))),]
 DeconData<-data.frame(VirtualMatrix,signatures[match(rownames(VirtualMatrix),rownames(signatures)),])
 DeconData<-na.omit(DeconData)
 DeconData.tmp<-DeconData[na.omit(match(topgsi[,1],rownames(DeconData))),]
+
 VirtualMatrix=data.frame(DeconData.tmp[,grep("CCTmix",colnames(DeconData))])
 Signatures=data.frame(DeconData.tmp[,-grep("CCTmix",colnames(DeconData))])
 library(car)
@@ -247,7 +246,7 @@ rownames(acc)=colnames(NewVirtualMatrix)
 acc
 write.table(acc,file="Colon-mixtureSimulation.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
 
-# Deconvolution-QR-Real Colon Plasma
+# Deconvolution-QR-Real Plasma Data
 DeconData<-data.frame(RealMatrix,signatures[match(rownames(RealMatrix),rownames(signatures)),])
 DeconData.tmp<-DeconData[na.omit(match(topgsi[,1],rownames(DeconData))),]
 RealMatrix1=data.frame(DeconData.tmp[,grep("CCP",colnames(DeconData))])
@@ -290,4 +289,5 @@ write.table(acc3,file="LungPlasma-RealSample.Deconvolution.txt",col.names=NA,row
 write.table(colMeans(acc1),file="Colon-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
 write.table(colMeans(acc2),file="NormalPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
 write.table(colMeans(acc3),file="LungPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
+save.image(file="Deconvolution.image.RData")
 ```
