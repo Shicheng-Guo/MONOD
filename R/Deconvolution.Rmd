@@ -101,7 +101,7 @@ TopGSIByCategory<-function(gsi,top=2,thresHigh=0.3,thresLow=0.1,plotfigure=T,fig
   dev.off()
   
   if(plotfigure==T){
-    HeatMap(data=data.matrix(GSIRlt[,4:ncol(GSIRlt)]),phen=gsub("AVE.","",colnames(GSIRlt)[4:ncol(GSIRlt)]),figure=otf2)
+    HeatMap(data=data.matrix(na.omit(GSIRlt[,4:ncol(GSIRlt)])),phen=gsub("AVE.","",colnames(GSIRlt)[4:ncol(GSIRlt)]),figure=otf2)
   }
   return(GSIRlt)
 }
@@ -162,6 +162,24 @@ ci95<-function(x){
   }
   return(out)
 }
+inputrim<-function(NewRealMatrix,NewSignatures){
+rlt<-list()
+input<-na.omit(data.frame(NewRealMatrix,NewSignatures))
+NewRealMatrix=input[,grep("CP",colnames(input))]
+NewSignatures=input[,-grep("CP",colnames(input))]
+rlt$NewRealMatrix=NewRealMatrix
+rlt$NewSignatures=NewSignatures
+return(rlt)
+}
+RandomSamplingMean<-function(data,number=round(ncol(data)/2)){
+  rlt<-c()
+  for(i in 1:ncol(data)){
+    VirtualSample<-rowMeans(data[,sample(1:ncol(data),number)],na.rm=T)  
+    rlt<-cbind(rlt,VirtualSample)
+  }
+  rlt
+}
+
 ```
 
 ```{r}
@@ -169,8 +187,8 @@ outputprefix="Coloncancer.plasma.0.05.top100"
 library("DeconRNASeq")
 library("ggplot2")
 setwd("/home/shg047/oasis/monod/hapinfo/June")
-Colon<-Coloncancerdatapre()
-save(Colon,file=paste(outputprefix,".input.RData",sep=""))
+# Colon<-Coloncancerdatapre()
+# save(Colon,file=paste(outputprefix,".input.RData",sep=""))
 load("Coloncancer.plasma.0.05.top100.input.RData")
 ```
 
@@ -207,12 +225,14 @@ return(Rlt)
 }
 rlt<-linearMHB()
 linearMHBs<-rownames(rlt$data)
+save.image(file="Deconvolution.image.RData")
 ```
 
 ```{r Deconvolution, echo=T}
 ######################################################################################################
 ############## feature selection of tissue specific MHBs for deconvolution ########################
 ######################################################################################################
+
 # select MHBs with linear pattern in mixture
 data1=Colon$data[match(linearMHBs,rownames(Colon$data)),]
 data1_ref=Colon$ref[match(linearMHBs,rownames(Colon$ref)),]
@@ -220,18 +240,19 @@ data1_ref=Colon$ref[match(linearMHBs,rownames(Colon$ref)),]
 # select tissue specific MHBs
 signatures<-AverageWithGroup(data1_ref)  
 outputprefix="TopGSIByCategory"
-topgsi<-TopGSIByCategory(Colon$GSI,top=200,thresHigh=0.3,thresLow=0.1,plotfigure=T,figprefix=outputprefix)
+
+topGSIVar<-50
+topgsi<-TopGSIByCategory(na.omit(Colon$GSI),top=topGSIVar,thresHigh=0.3,thresLow=0.1,plotfigure=T,figprefix=outputprefix)
 
 # simulation data and real data
 VirtualMatrix<-data.frame((data1[,grep("CCTmix",colnames(data1))]))
-RealMatrix<-data.frame((data1[,grep("CCP",colnames(data1))]))
-RealMatrix<-RealMatrix[-which(! is.finite(rowSums(RealMatrix))),]
+RealMatrix<-data.frame((data1[,grep("CCP|LCP|NCP",colnames(data1))]))
+#RealMatrix<-RealMatrix[-which(! is.finite(rowSums(RealMatrix))),]
 
 # Deconvolution-QR-Simulation
 DeconData<-data.frame(VirtualMatrix,signatures[match(rownames(VirtualMatrix),rownames(signatures)),])
 DeconData<-na.omit(DeconData)
 DeconData.tmp<-DeconData[na.omit(match(topgsi[,1],rownames(DeconData))),]
-
 VirtualMatrix=data.frame(DeconData.tmp[,grep("CCTmix",colnames(DeconData))])
 Signatures=data.frame(DeconData.tmp[,-grep("CCTmix",colnames(DeconData))])
 library(car)
@@ -244,7 +265,8 @@ Rlt<-DeconRNASeq(NewVirtualMatrix,NewSignatures,checksig=FALSE,known.prop = F, u
 acc<-Rlt$out.all
 rownames(acc)=colnames(NewVirtualMatrix)
 acc
-write.table(acc,file="Colon-mixtureSimulation.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
+fileout=paste("Colon-mixtureSimulation.Deconvolution.",topGSIVar,"M.txt",sep="")
+write.table(acc,file=fileout,col.names=NA,row.names=T,sep="\t",quote=F)
 
 # Deconvolution-QR-Real Plasma Data
 DeconData<-data.frame(RealMatrix,signatures[match(rownames(RealMatrix),rownames(signatures)),])
@@ -253,7 +275,6 @@ RealMatrix1=data.frame(DeconData.tmp[,grep("CCP",colnames(DeconData))])
 RealMatrix2=data.frame(DeconData.tmp[,grep("NCP",colnames(DeconData))])
 RealMatrix3=data.frame(DeconData.tmp[,grep("LCP",colnames(DeconData))])
 Signatures=data.frame(DeconData.tmp[,-grep("CCP|LCP|NCP",colnames(DeconData))])
-
 # Normalization (logit transform)
 library(car)
 # NewRealMatrix1=logit(RealMatrix1)
@@ -264,16 +285,40 @@ NewRealMatrix2=(RealMatrix2)
 NewRealMatrix3=(RealMatrix3)
 NewSignatures=(Signatures)
 
+NewRealMatrix1=RandomSamplingMean(RealMatrix1)
+NewRealMatrix2=RandomSamplingMean(RealMatrix2)
+NewRealMatrix3=RandomSamplingMean(RealMatrix3)
+NewSignatures=(Signatures)
+
 library("DeconRNASeq")
-Rlt1<-DeconRNASeq(NewRealMatrix1,NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
-Rlt2<-DeconRNASeq(NewRealMatrix2,NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
-Rlt3<-DeconRNASeq(NewRealMatrix3,NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
+
+input1<-inputrim(NewRealMatrix1,NewSignatures)
+input2<-inputrim(NewRealMatrix2,NewSignatures)
+input3<-inputrim(NewRealMatrix3,NewSignatures)
+
+dim(input1$NewRealMatrix)
+dim(input2$NewRealMatrix)
+dim(input3$NewRealMatrix)
+
+Rlt1<-DeconRNASeq(input1$NewRealMatrix,input1$NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
+Rlt2<-DeconRNASeq(input2$NewRealMatrix,input2$NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
+Rlt3<-DeconRNASeq(input3$NewRealMatrix,input3$NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
+
 acc1<-Rlt1$out.all
 acc2<-Rlt2$out.all
 acc3<-Rlt3$out.all
 rownames(acc1)=colnames(NewRealMatrix1)
 rownames(acc2)=colnames(NewRealMatrix2)
 rownames(acc3)=colnames(NewRealMatrix3)
+
+acc1<-data.frame(acc1)
+acc2<-data.frame(acc2)
+acc3<-data.frame(acc3)
+
+acc1<-subset(acc1,WBC>0.3)
+acc2<-subset(acc2,WBC>0.3)
+acc3<-subset(acc3,WBC>0.3)
+
 acc1
 boxplot(acc1)
 colMeans(acc1)
@@ -283,11 +328,38 @@ colMeans(acc2)
 acc3
 boxplot(acc3)
 colMeans(acc3)
-write.table(acc1,file="Colon-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
-write.table(acc2,file="NormalPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
-write.table(acc3,file="LungPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
-write.table(colMeans(acc1),file="Colon-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
-write.table(colMeans(acc2),file="NormalPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
-write.table(colMeans(acc3),file="LungPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t")
+
+out<-rbind(colMeans(acc1),colMeans(acc2),colMeans(acc3))
+rownames(out)<-c("CCP","NP","LCP")
+out
+
+write.table(acc1,file="Colon-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
+write.table(acc2,file="NormalPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
+write.table(acc3,file="LungPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
+write.table(colMeans(acc1),file="Colon-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t,quote=F")
+write.table(colMeans(acc2),file="NormalPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
+write.table(colMeans(acc3),file="LungPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
+
+
+pdf("deconv.boxplot.contribution.pdf")
+par(mfrow=c(3,3))
+boxplot(acc1,cex.axis=0.7,ylim=c(0,1),horizontal = T,las=1,main="CCP")
+boxplot(acc3,cex.axis=0.7,ylim=c(0,1),horizontal = T,las=1,main="LCP")
+boxplot(acc2,cex.axis=0.7,ylim=c(0,1),horizontal = T,las=1,main="NP")
+dev.off()
+
+gginput1<-data.frame(Conv=c(acc1[,2],acc2[,2]),group=c(rep("CCP",nrow(acc1)),rep("NP",nrow(acc2))))
+gginput2<-data.frame(Conv=c(acc3[,8],acc2[,8]),group=c(rep("LCP",nrow(acc3)),rep("NP",nrow(acc2))))
+
+library(cowplot)
+pdf("deconv.boxplot-compare.contribution.pdf")
+par(mfrow=c(2,2))
+plot1<-ggplot(gginput1,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA)+coord_cartesian(ylim=c(0,0.2))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank()) 
+plot2<-ggplot(gginput2,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA)+coord_cartesian(ylim=c(0,0.2))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank()) 
+grid.arrange(plot1, plot2, ncol=2)
+dev.off()
+
+
+write.table(out,file="Plasma-RealSample.Same.Contribution.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
 save.image(file="Deconvolution.image.RData")
 ```
