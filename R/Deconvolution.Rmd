@@ -1,5 +1,5 @@
 ---
-title: "Deconvolution to normal plasma dataset"
+title: "Deconvolution to cancer and normal plasma based on human normal tissues"
 author: "Shicheng Guo"
 date: "July 7, 2016"
 output: html_document
@@ -36,8 +36,6 @@ Coloncancerdatapre<-function(){
   rlt$signature<-signatures
   return(rlt)
 }
-
-
 GSIMethDecon<-function(data){
   data<-data.matrix(data)
   group=names(table(colnames(data)))
@@ -217,9 +215,9 @@ Rlt$R2<-R
 Rlt$data<-dataR
 return(Rlt)
 }
-rlt<-linearMHB()
-linearMHBs<-rownames(rlt$data)
-save.image(file="Colon.Deconvolution.Input.RData")
+#rlt<-linearMHB()
+#linearMHBs<-rownames(rlt$data)
+#save(linearMHBs,file="Colon.Decov.linear.Var.RData")
 ```
 
 ```{r Deconvolution, echo=T,warning=FALSE}
@@ -227,14 +225,13 @@ save.image(file="Colon.Deconvolution.Input.RData")
 ############## feature selection of tissue specific MHBs for deconvolution ########################
 ######################################################################################################
 # select MHBs with linear pattern in mixture
-
-load("Colon.Deconvolution.Input.RData")
+load("Colon.Decov.linear.Var.RData")
 data1=Colon$data[match(linearMHBs,rownames(Colon$data)),]
 data1_ref=Colon$ref[match(linearMHBs,rownames(Colon$ref)),]
 # select tissue specific MHBs
 signatures<-AverageWithGroup(data1_ref)  
 outputprefix="TopGSIByCategory"
-topGSIVar<-100
+topGSIVar<-300
 topgsi<-TopGSIByCategory(na.omit(Colon$GSI),top=topGSIVar,thresHigh=0.3,thresLow=0.1,plotfigure=T,figprefix=outputprefix)
 # simulation data and real data
 VirtualMatrix<-data.frame((data1[,grep("CCTmix",colnames(data1))]))
@@ -260,6 +257,20 @@ rownames(acc)=colnames(NewVirtualMatrix)
 acc
 fileout=paste("Colon-mixtureSimulation.Deconvolution.",topGSIVar,"M.txt",sep="")
 write.table(acc,file=fileout,col.names=NA,row.names=T,sep="\t",quote=F)
+
+idx<-unlist(lapply(strsplit(rownames(acc),"[.]"),function(x) x[[2]]))
+y<-as.numeric(acc[,2])
+lm.input<-data.frame(x=as.numeric(idx),y=100*y)
+lm.input<-lm.input[order(lm.input$x),]
+plot(y~x,data=lm.input,type="o",xlab="Expectation",ylab="Observed")
+abline(0, 1,lwd=2,col="red")
+dev.off()
+
+plot(1,1)
+abline(0, 1)
+
+
+
 
 ###################################################
 ##### Deconvolution-QR-Simulation-LCT #############
@@ -303,10 +314,10 @@ NewRealMatrix2=(RealMatrix2)
 NewRealMatrix3=(RealMatrix3)
 NewSignatures=(Signatures)
 
-NewRealMatrix1=RandomSamplingMean(RealMatrix1)
-NewRealMatrix2=RandomSamplingMean(RealMatrix2)
-NewRealMatrix3=RandomSamplingMean(RealMatrix3)
-NewSignatures=(Signatures)
+#NewRealMatrix1=RandomSamplingMean(RealMatrix1)
+#NewRealMatrix2=RandomSamplingMean(RealMatrix2)
+#NewRealMatrix3=RandomSamplingMean(RealMatrix3)
+#NewSignatures=(Signatures)
 
 library("DeconRNASeq")
 
@@ -316,15 +327,19 @@ input3<-inputrim(NewRealMatrix3,NewSignatures)
 dim(input1$NewRealMatrix)
 dim(input2$NewRealMatrix)
 dim(input3$NewRealMatrix)
+```
+
+```{r DeconvolutionRNAseq, echo=T}
 Rlt1<-DeconRNASeq(input1$NewRealMatrix,input1$NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
 Rlt2<-DeconRNASeq(input2$NewRealMatrix,input2$NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
 Rlt3<-DeconRNASeq(input3$NewRealMatrix,input3$NewSignatures,checksig=FALSE,known.prop = F, use.scale = TRUE, fig = TRUE)
+```
+
+```{r}
 acc1<-Rlt1$out.all
 acc2<-Rlt2$out.all
 acc3<-Rlt3$out.all
-```
 
-```{r,echo=T}
 rownames(acc1)=colnames(NewRealMatrix1)
 rownames(acc2)=colnames(NewRealMatrix2)
 rownames(acc3)=colnames(NewRealMatrix3)
@@ -333,23 +348,19 @@ acc1<-data.frame(acc1)
 acc2<-data.frame(acc2)
 acc3<-data.frame(acc3)
 
-acc1<-subset(acc1,WBC>0.1)
-acc2<-subset(acc2,WBC>0.1)
-acc3<-subset(acc3,WBC>0.1)
 
-acc1
-boxplot(acc1)
-colMeans(acc1)
-acc2
-boxplot(acc2)
-colMeans(acc2)
-acc3
-boxplot(acc3)
-colMeans(acc3)
+gginput1<-data.frame(Conv=c(acc1[,2],acc2[,2]),group=c(rep("CCP",nrow(acc1)),rep("NP",nrow(acc2))))
+gginput2<-data.frame(Conv=c(acc3[,8],acc2[,8]),group=c(rep("LCP",nrow(acc3)),rep("NP",nrow(acc2))))
+#pdf("deconv.boxplot-compare.Full.contribution.pdf")
+par(mfrow=c(2,2))
+ggplot(gginput1,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA,aes(fill = "blue"))+coord_cartesian(ylim=c(0,0.15))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank())+ geom_jitter()
+ggplot(gginput2,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA,aes(fill = "blue"))+coord_cartesian(ylim=c(0,0.15))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank())+ geom_jitter()
+#dev.off()
 
-out<-rbind(colMeans(acc1),colMeans(acc2),colMeans(acc3))
-rownames(out)<-c("CCP","NP","LCP")
-out
+# CCP vs NP
+wilcox.test(acc1[,2],acc2[,2])
+# LCP vs NP
+wilcox.test(acc3[,8],acc2[,8])
 
 # Colon cancer plasma deconvolution: frequency of DNA from colon cancer
 sum(acc1[,2]>0)/nrow(acc1)
@@ -358,6 +369,39 @@ sum(acc2[,2]>0)/nrow(acc2)
 sum(acc3[,8]>0)/nrow(acc3)
 sum(acc2[,8]>0)/nrow(acc2)
 
+# As our prior knownlege, WBC should be have higher proportion in the plasma (suppose>0.3)
+acc1<-subset(acc1,WBC>0.3)
+acc2<-subset(acc2,WBC>0.3)
+acc3<-subset(acc3,WBC>0.3)
+
+ci95(c(acc1[,12],acc2[,12],acc3[,12]))
+
+ci95(c(acc1[,2]+acc1[,3]))
+ci95(c(acc3[,8]+acc3[,10]))
+
+ci95(c(acc1[,2],acc3[,8]))
+ci95(c(acc1[,3],acc3[,10]))
+
+ci95(c(acc2[,2]))
+ci95(c(acc2[,8]))
+
+
+
+
+acc1
+boxplot(acc1,cex.axis=0.75)
+colMeans(acc1)
+acc2
+boxplot(acc2,cex.axis=0.75)
+colMeans(acc2)
+acc3
+boxplot(acc3,cex.axis=0.75)
+colMeans(acc3)
+
+out<-rbind(colMeans(acc1),colMeans(acc2),colMeans(acc3))
+rownames(out)<-c("CCP","NP","LCP")
+out
+
 write.table(acc1,file="Colon-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
 write.table(acc2,file="NormalPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
 write.table(acc3,file="LungPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
@@ -365,9 +409,7 @@ write.table(colMeans(acc1),file="Colon-RealSample.ColMeans.Deconvolution.txt",co
 write.table(colMeans(acc2),file="NormalPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
 write.table(colMeans(acc3),file="LungPlasma-RealSample.ColMeans.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
 
-
 # pdf("deconv.boxplot.contribution.pdf")
-par(mfrow=c(3,3))
 boxplot(acc1,cex.axis=0.7,ylim=c(0,1),horizontal = T,las=1,main="CCP")
 boxplot(acc3,cex.axis=0.7,ylim=c(0,1),horizontal = T,las=1,main="LCP")
 boxplot(acc2,cex.axis=0.7,ylim=c(0,1),horizontal = T,las=1,main="NP")
@@ -375,16 +417,25 @@ boxplot(acc2,cex.axis=0.7,ylim=c(0,1),horizontal = T,las=1,main="NP")
 
 gginput1<-data.frame(Conv=c(acc1[,2],acc2[,2]),group=c(rep("CCP",nrow(acc1)),rep("NP",nrow(acc2))))
 gginput2<-data.frame(Conv=c(acc3[,8],acc2[,8]),group=c(rep("LCP",nrow(acc3)),rep("NP",nrow(acc2))))
-
-library(cowplot)
 #  pdf("deconv.boxplot-compare.contribution.pdf")
 par(mfrow=c(2,2))
-plot1<-ggplot(gginput1,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA)+coord_cartesian(ylim=c(0,0.2))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank()) 
-plot2<-ggplot(gginput2,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA)+coord_cartesian(ylim=c(0,0.2))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank()) 
-grid.arrange(plot1, plot2, ncol=2)
+ggplot(gginput1,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA)+coord_cartesian(ylim=c(0,0.2))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank())+ geom_jitter()
+ggplot(gginput2,aes(factor(group), Conv))+geom_boxplot(outlier.shape = NA)+coord_cartesian(ylim=c(0,0.2))+theme_bw()+theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank())+ geom_jitter()
 # dev.off()
 
+ci95(c(acc1[,12],acc2[,12],acc3[,12]))
 
 write.table(out,file="Plasma-RealSample.Same.Contribution.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
 save.image(file="Deconvolution.image.RData")
 ```
+
+# Conclustion
+
+We sought to quantify the tumor load based on the deconvolution analysis to the cancer and normal plasma by non-negative decomposition with quadratic programming with the reference of LC, CRC and 10 normal tissues. We estimated that a predominant fraction, 72.0% (95% CI:0.659-0.782) in the cancer and normal plasma were contributed by white blood cells, which is consistent with the levels reported in a recent study based on lower-coverage whole genome bisulfite sequencing (69.4%)16.  Primary tumor and normal tissue-of-origin contributes at the similar level of 2.3% (95% CI: 0.4%-4.2%) and 3.0% (95% CI:1.2%-4.4%). We also applied the similar analysis to normal plasma, and we found the tumor contribution to normal plasma were significantly lower (P=3.4x10-5 and 5.2x10-10 for CRC and LC, respectively) than that to cancer plasma, with the contribution of 0.17% and 1.0% for colon and lung cancer respectively. We also found 76.7% CRC and 89.6% LC samples were detected the contribution from tumor tissues while only 13% and 26% normal plasmas have certain (low) tumor contribution. Therefore, circulating cell-free DNA contains a relatively stable fraction of molecules released from various normal tissues, whereas in cancer patient tumor cells and apoptosis cells released DNA molecules that can be more abundant than normal tissues (Table S6). 
+
+```{r closet,echo=T}
+# R -e 'library("rmarkdown");library("knitr");rmarkdown::render("Deconv.Rmd")'
+# R -e 'library("markdown");rpubsUpload("normalDev","Deconv.html")'
+```
+
+
