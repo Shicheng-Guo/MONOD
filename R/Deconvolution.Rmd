@@ -66,14 +66,6 @@ AverageWithGroup<-function(data){
   matrix<-matrix[!rowSums(!is.finite(matrix)),]
   return(matrix)
 }
-RandomSamplingMean<-function(data,number=round(ncol(data)/2)){
-  rlt<-c()
-  for(i in 1:ncol(data)){
-    VirtualSample<-rowMeans(data[,sample(1:ncol(data),number)],na.rm=T)  
-    rlt<-cbind(rlt,VirtualSample)
-  }
-  rlt
-}
 TopGSIByCategory<-function(gsi,top=2,thresHigh=0.3,thresLow=0.1,plotfigure=T,figprefix="tissuespecific"){
   GSIRlt<-c()
   group<-as.character(unique(gsi$group))
@@ -177,7 +169,8 @@ RandomSamplingMean<-function(data,number=round(ncol(data)/2)){
     VirtualSample<-rowMeans(data[,sample(1:ncol(data),number)],na.rm=T)  
     rlt<-cbind(rlt,VirtualSample)
   }
-  rlt
+  colnames(rlt)<-paste("VirtualSample",1:ncol(data),sep="")
+  return(rlt)
 }
 
 ```
@@ -241,7 +234,7 @@ data1_ref=Colon$ref[match(linearMHBs,rownames(Colon$ref)),]
 signatures<-AverageWithGroup(data1_ref)  
 outputprefix="TopGSIByCategory"
 
-topGSIVar<-50
+topGSIVar<-100
 topgsi<-TopGSIByCategory(na.omit(Colon$GSI),top=topGSIVar,thresHigh=0.3,thresLow=0.1,plotfigure=T,figprefix=outputprefix)
 
 # simulation data and real data
@@ -315,9 +308,9 @@ acc1<-data.frame(acc1)
 acc2<-data.frame(acc2)
 acc3<-data.frame(acc3)
 
-acc1<-subset(acc1,WBC>0.3)
-acc2<-subset(acc2,WBC>0.3)
-acc3<-subset(acc3,WBC>0.3)
+acc1<-subset(acc1,WBC>0.1)
+acc2<-subset(acc2,WBC>0.1)
+acc3<-subset(acc3,WBC>0.1)
 
 acc1
 boxplot(acc1)
@@ -332,6 +325,13 @@ colMeans(acc3)
 out<-rbind(colMeans(acc1),colMeans(acc2),colMeans(acc3))
 rownames(out)<-c("CCP","NP","LCP")
 out
+
+# Colon cancer plasma deconvolution: frequency of DNA from colon cancer
+sum(acc1[,2]>0)/nrow(acc1)
+sum(acc2[,2]>0)/nrow(acc2)
+# Lung cancer plasma deconvolution: frequency of DNA from colon cancer
+sum(acc3[,8]>0)/nrow(acc3)
+sum(acc2[,8]>0)/nrow(acc2)
 
 write.table(acc1,file="Colon-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
 write.table(acc2,file="NormalPlasma-RealSample.Deconvolution.txt",col.names=NA,row.names=T,sep="\t",quote=F)
