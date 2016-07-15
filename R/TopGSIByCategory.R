@@ -31,5 +31,6 @@ TopGSIByCategory<-function(gsi,top=1,thresHigh=0.3,thresLow=0.1,plotfigure=T,fig
   if(plotfigure==T){
     HeatMap(data=data.matrix(na.omit(GSIRlt[,4:ncol(GSIRlt)])),phen=gsub("AVE.","",colnames(GSIRlt)[4:ncol(GSIRlt)]),figure=otf2)
   }
+  GSIRlt<-na.omit(GSIRlt)
   return(GSIRlt)
 }
