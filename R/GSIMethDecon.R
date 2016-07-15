@@ -16,6 +16,6 @@ GSIMethDecon<-function(data){
     avebase<-rbind(avebase,ave)
     print(i)
   }
-  rlt=data.frame(region=rownames(data),group=gmaxgroup,GSI=gsi,avebase)
+  rlt=data.frame(region=rownames(data),group=gmaxgroup,GSI=gsi,avebase) # here, warning is caused by rownames is chr10:1234-3945, need update
   return(rlt)
 }
