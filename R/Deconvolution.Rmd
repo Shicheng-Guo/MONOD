@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r setup,echo=F}  
+
 Coloncancerdatapre<-function(){
   rlt<-list()
   setwd("/home/shg047/oasis/monod/hapinfo/June")
