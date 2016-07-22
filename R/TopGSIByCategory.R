@@ -1,3 +1,4 @@
+
 TopGSIByCategory<-function(gsi,top=1,thresHigh=0.3,thresLow=0.1,plotfigure=T,figprefix="tissuespecific"){
   GSIRlt<-c()
   group<-as.character(unique(gsi$group))
